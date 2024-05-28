@@ -1,0 +1,10 @@
+{
+    "files.associations": {
+        "cstdlib": "c",
+        "memory_resource": "c",
+        "memory": "c",
+        "new": "c",
+        "chrono": "c",
+        "typeinfo": "c"
+    }
+}
