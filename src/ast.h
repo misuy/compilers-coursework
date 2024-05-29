@@ -1,5 +1,13 @@
+#ifndef _AST_H
+#define _AST_H
+
 #include <inttypes.h>
 #include <stdlib.h>
+#include <stdio.h>
+
+
+#define REC_SHIFT 3
+
 
 typedef enum NodeType {
     NODE_TYPE_BLK,
@@ -10,7 +18,7 @@ typedef enum NodeType {
 
 
 typedef enum ExprType {
-    EXPT_TYPE_VAR,
+    EXPR_TYPE_VAR,
     EXPR_TYPE_U32_VALUE,
     EXPR_TYPE_I32_VALUE,
     EXPR_TYPE_BOOL_VALUE,
@@ -24,6 +32,7 @@ typedef enum UnaryOpType {
 
 typedef enum BinaryOpType {
     BINARY_OP_TYPE_EQUAL,
+    BINARY_OP_TYPE_NOT_EQUAL,
     BINARY_OP_TYPE_LESS,
     BINARY_OP_TYPE_GREATER,
     BINARY_OP_TYPE_AND,
@@ -109,10 +118,18 @@ typedef struct AssignData {
     Node *expr; // NODE_TYPE_EXPR
 } AssignData;
 
-typedef struct IfData {
+typedef struct IfCase {
     Node *cond; // NODE_TYPE_EXPR
     Node *body; // NODE_TYPE_BLK
-    struct IfData *next_if; // STMT_TYPE_IF
+} IfCase;
+
+typedef struct IfCaseList {
+    IfCase *if_case;
+    struct IfCaseList *next;
+} IfCaseList;
+
+typedef struct IfData {
+    IfCaseList *if_case_list;
 } IfData;
 
 typedef struct ForData {
@@ -124,9 +141,13 @@ typedef struct ForData {
 
 
 
-typedef struct BlkData {
+typedef struct StmtList {
     Node *stmt; // NODE_TYPE_STMT
-    Node *next; // NODE_TYPE_BLK
+    struct StmtList *next;
+} StmtList;
+
+typedef struct BlkData {
+    StmtList *stmt_list;
 } BlkData;
 
 
@@ -143,6 +164,18 @@ BinaryOpData * new_binary_op_data(BinaryOpType type, Node *left_operand, Node *r
 StmtData * new_stmt_data(StmtType type, void *data);
 VarDeclData * new_var_decl_data(DataType type, char *name);
 AssignData * new_assign_data(Node *var, Node *expr);
-IfData * new_if_data(Node *cond, Node *body, Node *next_if);
+
+IfCase * new_if_case(Node *cond, Node *body);
+IfCaseList * new_if_case_list(IfCase *if_case, IfCaseList *next);
+IfData * new_if_data(IfCaseList *if_case_list);
+
 ForData * new_for_data(Node *init, Node *cond, Node *it, Node *body);
-BlkData * new_blk_data(Node *stmt, Node *next);
+
+StmtList * new_stmt_list(Node *stmt, StmtList *next);
+BlkData * new_blk_data(StmtList *stmt_list);
+
+
+void print_node(FILE *out, Node *node, uint32_t rec);
+
+
+#endif
