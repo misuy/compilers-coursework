@@ -1,6 +1,7 @@
 #include "lang.tab.h"
 #include "ast.h"
 #include "stdio.h"
+#include "ir.h"
 
 extern FILE *yyin;
 
@@ -10,8 +11,12 @@ int main() {
     printf("start\n");
     yyparse(&result);
     printf("\n");
-    FILE *f = fopen("out", "w");
     print_node(stdout, result, 0);
+    printf("before ir\n");
+    IR *ir = ir_build(result);
+    printf("ir\n");
+    ir_print(stdout, ir);
+    printf("after ir\n");
     //printf("%lu\n", result);
 }
 

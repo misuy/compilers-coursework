@@ -1,6 +1,51 @@
 #include "ir.h"
 
 
+IR * ir_new();
+void ir_add_inst(IR *ir, IRInst *inst);
+
+IRInst * ir_inst_new(IRInstType type, IROp *op1, IROp *op2, IROp *op3);
+
+IRRegMapping * ir_reg_mapping_new();
+uint32_t ir_reg_mapping_get_items_count(IRRegMapping *mapping);
+void ir_reg_mapping_add_mapping_item(IRRegMapping *mapping, IRRegMappingItem *item);
+IRRegMappingItem * ir_reg_mapping_get_mapping_item_by_number(IRRegMapping *mapping, uint32_t number);
+uint32_t ir_reg_mapping_find_mapping_item_number_by_var_name(IRRegMapping *mapping, char *name);
+
+IRReg * ir_reg_new(uint32_t number);
+IRImm * ir_imm_new(IRDataType type, uint32_t value);
+IROp * ir_op_new(IROpDirection direction, IROpType type, void *data);
+IRDataType ir_op_get_data_type(IRRegMapping *mapping, IROp *op);
+
+IROp * ir_from_var(IR *ir, VarData *var);
+IROp * ir_from_i32_value(IR *ir, I32ValueData *i32_value);
+IROp * ir_from_bool_value(IR *ir, BoolValueData *bool_value);
+IROp * ir_from_unary_op(IR *ir, UnaryOpData *unary_op);
+IROp * ir_from_binary_op(IR *ir, BinaryOpData *binary_op);
+IROp * ir_from_expr(IR *ir, ExprData *expr);
+
+void ir_from_var_decl(IR *ir, VarDeclData *var_decl);
+void ir_from_assign(IR *ir, AssignData *assign);
+void ir_from_stmt(IR* ir, StmtData *stmt);
+
+void ir_from_blk(IR *ir, BlkData *blk);
+
+void ir_from_node(IR *ir, Node *node);
+
+void print_spaces(FILE *out, uint32_t count);
+void ir_reg_print(FILE *out, IRReg *reg, uint32_t rec);
+void ir_imm_print(FILE *out, IRImm *imm, uint32_t rec);
+void ir_op_print(FILE *out, IROp *op, uint32_t rec);
+void ir_inst_print(FILE *out, IRInst *inst, uint32_t rec);
+
+
+
+IR * ir_new() {
+    IR *ret = malloc(sizeof(IR));
+    ret->instructions = vector_new(sizeof(IRInst), 10);
+    ret->reg_mapping = ir_reg_mapping_new();
+    return ret;
+}
 
 void ir_add_inst(IR *ir, IRInst *inst) {
     vector_push_back(ir->instructions, inst);
@@ -18,6 +63,12 @@ IRInst * ir_inst_new(IRInstType type, IROp *op1, IROp *op2, IROp *op3) {
 }
 
 
+
+IRRegMapping * ir_reg_mapping_new() {
+    IRRegMapping *ret = malloc(sizeof(IRRegMapping));
+    ret->items = vector_new(sizeof(IRRegMappingItem), 10);
+    return ret;
+}
 
 uint32_t ir_reg_mapping_get_items_count(IRRegMapping *mapping) {
     return mapping->items->items_count;
@@ -84,7 +135,7 @@ IRDataType ir_op_get_data_type(IRRegMapping *mapping, IROp *op) {
 
 
 IROp * ir_from_var(IR *ir, VarData *var) {
-    uint32_t number = ir_reg_mapping_find_reg_by_var_name(ir->reg_mapping, var->name);
+    uint32_t number = ir_reg_mapping_find_mapping_item_number_by_var_name(ir->reg_mapping, var->name);
     if (number == 0)
         return NULL;
     
@@ -103,7 +154,7 @@ IROp * ir_from_unary_op(IR *ir, UnaryOpData *unary_op) {
     if (unary_op->operand->type != NODE_TYPE_EXPR)
         return NULL;
     
-    IROp *src_op = ir_from_expr(ir, unary_op->operand);
+    IROp *src_op = ir_from_expr(ir, unary_op->operand->data);
     if (!src_op)
         return NULL;
 
@@ -114,7 +165,6 @@ IROp * ir_from_unary_op(IR *ir, UnaryOpData *unary_op) {
     dest_item.type = ir_op_get_data_type(ir->reg_mapping, src_op);
 
     IRInstType inst_type;
-
     switch (unary_op->type) {
         case UNARY_OP_TYPE_NOT:
             inst_type = IR_INST_TYPE_NOT;
@@ -132,30 +182,364 @@ IROp * ir_from_unary_op(IR *ir, UnaryOpData *unary_op) {
     return ir_op_new(IR_OP_DIRECTION_UNKNOWN, IR_OP_TYPE_REG, ir_reg_new(ir_reg_mapping_get_items_count(ir->reg_mapping)));
 }
 
-IROp * ir_from_binary_exp(IR *ir, BinaryOpData *binary_op) {
+IROp * ir_from_binary_op(IR *ir, BinaryOpData *binary_op) {
     if (binary_op->right_operand->type != NODE_TYPE_EXPR)
         return NULL;
 
-    IROp *right_src_op = ir_from_expr(ir, binary_op->right_operand);
+    IROp *right_src_op = ir_from_expr(ir, binary_op->right_operand->data);
     if (!right_src_op)
         return NULL;
     right_src_op->direction = IR_OP_DIRECTION_SRC;
+    IRDataType right_src_type = ir_op_get_data_type(ir->reg_mapping, right_src_op);
 
     if (binary_op->left_operand->type != NODE_TYPE_EXPR)
         return NULL;
 
-    IROp *left_src_op = ir_from_expr(ir, binary_op->left_operand);
+    IROp *left_src_op = ir_from_expr(ir, binary_op->left_operand->data);
     if (!left_src_op)
         return NULL;
     left_src_op->direction = IR_OP_DIRECTION_SRC;
+    IRDataType left_src_type = ir_op_get_data_type(ir->reg_mapping, left_src_op);
 
+    IRRegMappingItem dest_item;
+    dest_item.var_name = NULL;
+
+    if ((left_src_op->type == IR_DATA_TYPE_BOOL) & (right_src_op->type == IR_DATA_TYPE_BOOL))
+        dest_item.type = IR_DATA_TYPE_BOOL;
+    else
+        dest_item.type = IR_DATA_TYPE_I32;
+
+    IRInstType inst_type;
+    switch (binary_op->type) {
+        case BINARY_OP_TYPE_EQUAL:
+            inst_type = IR_INST_TYPE_EQUAL;
+            dest_item.type = IR_DATA_TYPE_BOOL;
+            break;
+        case BINARY_OP_TYPE_NOT_EQUAL:
+            inst_type = IR_INST_TYPE_NOT_EQUAL;
+            dest_item.type = IR_DATA_TYPE_BOOL;
+            break;
+        case BINARY_OP_TYPE_LESS:
+            inst_type = IR_INST_TYPE_LESS;
+            dest_item.type = IR_DATA_TYPE_BOOL;
+            break;
+        case BINARY_OP_TYPE_GREATER:
+            inst_type = IR_INST_TYPE_GREATER;
+            dest_item.type = IR_DATA_TYPE_BOOL;
+            break;
+        case BINARY_OP_TYPE_AND:
+            inst_type = IR_INST_TYPE_AND;
+            break;
+        case BINARY_OP_TYPE_OR:
+            inst_type = IR_INST_TYPE_OR;
+            break;
+        case BINARY_OP_TYPE_XOR:
+            inst_type = IR_INST_TYPE_XOR;
+            break;
+        case BINARY_OP_TYPE_ADD:
+            inst_type = IR_INST_TYPE_ADD;
+            dest_item.type = IR_DATA_TYPE_I32;
+            break;
+        case BINARY_OP_TYPE_SUB:
+            inst_type = IR_INST_TYPE_SUB;
+            dest_item.type = IR_DATA_TYPE_I32;
+            break;
+        case BINARY_OP_TYPE_MUL:
+            inst_type = IR_INST_TYPE_MUL;
+            dest_item.type = IR_DATA_TYPE_I32;
+            break;
+        case BINARY_OP_TYPE_DIV:
+            inst_type = IR_INST_TYPE_DIV;
+            dest_item.type = IR_DATA_TYPE_I32;
+            break;
+        default:
+            return NULL;
+    }
+
+    ir_reg_mapping_add_mapping_item(ir->reg_mapping, &dest_item);
     
-    
+    IROp *dest_op = ir_op_new(IR_OP_DIRECTION_DEST, IR_OP_TYPE_REG, ir_reg_new(ir_reg_mapping_get_items_count(ir->reg_mapping)));
+
+    IRInst *inst = ir_inst_new(inst_type, dest_op, left_src_op, right_src_op);
+    ir_add_inst(ir, inst);
+
+    return ir_op_new(IR_OP_DIRECTION_UNKNOWN, IR_OP_TYPE_REG, ir_reg_new(ir_reg_mapping_get_items_count(ir->reg_mapping)));
 }
 
 IROp * ir_from_expr(IR *ir, ExprData *expr) {    
+    if (!expr)
+        return NULL;
+
     switch (expr->type) {
         case EXPR_TYPE_VAR:
-
+            return ir_from_var(ir, expr->data);
+        case EXPR_TYPE_I32_VALUE:
+            return ir_from_i32_value(ir, expr->data);
+        case EXPR_TYPE_BOOL_VALUE:
+            return ir_from_bool_value(ir, expr->data);
+        case EXPR_TYPE_UNARY_OP:
+            return ir_from_unary_op(ir, expr->data);
+        case EXPR_TYPE_BINARY_OP:
+            return ir_from_binary_op(ir, expr->data);
+        default:
+            return NULL;
     }
+}
+
+
+
+void ir_from_var_decl(IR *ir, VarDeclData *var_decl) {
+    if (ir_reg_mapping_find_mapping_item_number_by_var_name(ir->reg_mapping, var_decl->name) != 0)
+        return;
+    IRRegMappingItem item;
+    item.var_name = var_decl->name;
+    switch (var_decl->type) {
+        case DATA_TYPE_BOOL:
+            item.type = IR_DATA_TYPE_BOOL;
+            break;
+        case DATA_TYPE_I32:
+            item.type = IR_DATA_TYPE_I32;
+            break;
+        default:
+            return;
+    }
+
+    ir_reg_mapping_add_mapping_item(ir->reg_mapping, &item);
+}
+
+void ir_from_assign(IR *ir, AssignData *assign) {
+    if (assign->var->type != NODE_TYPE_EXPR)
+        return;
+    IROp *dest_op = ir_from_expr(ir, assign->var->data);
+    if (!dest_op)
+        return;
+    if (dest_op->type != IR_OP_TYPE_REG)
+        return;
+    dest_op->direction = IR_OP_DIRECTION_DEST;
+    
+    if (assign->expr->type != NODE_TYPE_EXPR)
+        return;
+    IROp *src_op = ir_from_expr(ir, assign->expr->data);
+    if (!src_op)
+        return;
+    src_op->direction = IR_OP_DIRECTION_SRC;
+    
+    if ((ir_op_get_data_type(ir->reg_mapping, dest_op) == IR_DATA_TYPE_BOOL) & (ir_op_get_data_type(ir->reg_mapping, src_op) == IR_DATA_TYPE_I32))
+        return;
+    
+    IRInst *inst = ir_inst_new(IR_INST_TYPE_MOV, dest_op, src_op, NULL);
+    ir_add_inst(ir, inst);
+}
+
+void ir_from_stmt(IR* ir, StmtData *stmt) {
+    if (!stmt)
+        return;
+    
+    switch (stmt->type) {
+        case STMT_TYPE_VAR_DECL:
+            ir_from_var_decl(ir, stmt->data);
+            break;
+        case STMT_TYPE_ASSIGN:
+            ir_from_assign(ir, stmt->data);
+            break;
+        default:
+            break;
+    }
+}
+
+
+
+void ir_from_blk(IR *ir, BlkData *blk) {
+    if (!blk)
+        return;
+
+    StmtList *list = blk->stmt_list;
+    while (list) {
+        ir_from_node(ir, list->stmt);
+        list = list->next;
+    }
+}
+
+
+
+void ir_from_node(IR *ir, Node *node) {
+    if (!node)
+        return;
+    
+    switch (node->type) {
+        case NODE_TYPE_STMT:
+            ir_from_stmt(ir, node->data);
+            break;
+        case NODE_TYPE_EXPR:
+            ir_from_expr(ir, node->data);
+            break;
+        case NODE_TYPE_BLK:
+            ir_from_blk(ir, node->data);
+            break;
+        default:
+            break;
+    }
+}
+
+
+
+void ir_reg_print(FILE *out, IRReg *reg, uint32_t rec) {
+    print_spaces(out, rec);
+    fprintf(out, "number: %"PRIu32"\n", reg->number);
+}
+
+void ir_imm_print(FILE *out, IRImm *imm, uint32_t rec) {
+    print_spaces(out, rec);
+    fprintf(out, "type: ");
+    switch (imm->type) {
+        case IR_DATA_TYPE_BOOL:
+            fprintf(out, "BOOL");
+            break;
+        case IR_DATA_TYPE_I32:
+            fprintf(out, "I32");
+            break;
+        default:
+            break;
+    }
+    fprintf(out, "\n");
+
+    print_spaces(out, rec);
+    fprintf(out, "value: %"PRIu32"\n", imm->value);
+}
+
+void ir_op_print(FILE *out, IROp *op, uint32_t rec) {
+    print_spaces(out, rec);
+    if (!op) {
+        fprintf(out, "NULL\n");
+        return;
+    }
+    
+    fprintf(out, "direction: ");
+    switch (op->direction) {
+        case IR_OP_DIRECTION_UNKNOWN:
+            fprintf(out, "UNKNOWN");
+            break;
+        case IR_OP_DIRECTION_SRC:
+            fprintf(out, "SRC");
+            break;
+        case IR_OP_DIRECTION_DEST:
+            fprintf(out, "DEST");
+            break;
+        default:
+            break;
+    }
+    fprintf(out, "\n");
+
+    print_spaces(out, rec);
+    fprintf(out, "type: ");
+    switch (op->type) {
+        case IR_OP_TYPE_IMM:
+            fprintf(out, "IMM\n");
+            ir_imm_print(out, op->data, rec + REC_SHIFT);
+            break;
+        case IR_OP_TYPE_REG:
+            fprintf(out, "REG\n");
+            ir_reg_print(out, op->data, rec + REC_SHIFT);
+            break;
+        default:
+            break;
+    }
+}
+
+void ir_inst_print(FILE *out, IRInst *inst, uint32_t rec) {
+    print_spaces(out, rec);
+    if (!inst) {
+        fprintf(out, "NULL\n");
+        return;
+    }
+
+    fprintf(out, "type: ");
+    switch (inst->type) {
+        case IR_INST_TYPE_MOV:
+            fprintf(out, "MOV");
+            break;
+        case IR_INST_TYPE_EQUAL:
+            fprintf(out, "EQUAL");
+            break;
+        case IR_INST_TYPE_NOT_EQUAL:
+            fprintf(out, "NOT_EQUAL");
+            break;
+        case IR_INST_TYPE_LESS:
+            fprintf(out, "LESS");
+            break;
+        case IR_INST_TYPE_GREATER:
+            fprintf(out, "GREATER");
+            break;
+        case IR_INST_TYPE_JMP:
+            fprintf(out, "JMP");
+            break;
+        case IR_INST_TYPE_JEQ:
+            fprintf(out, "JEQ");
+            break;
+        case IR_INST_TYPE_JNE:
+            fprintf(out, "JNE");
+            break;
+        case IR_INST_TYPE_LOAD:
+            fprintf(out, "LOAD");
+            break;
+        case IR_INST_TYPE_SAVE:
+            fprintf(out, "SAVE");
+            break;
+        case IR_INST_TYPE_NOT:
+            fprintf(out, "NOT");
+            break;
+        case IR_INST_TYPE_AND:
+            fprintf(out, "AND");
+            break;
+        case IR_INST_TYPE_OR:
+            fprintf(out, "OR");
+            break;
+        case IR_INST_TYPE_XOR:
+            fprintf(out, "XOR");
+            break;
+        case IR_INST_TYPE_ADD:
+            fprintf(out, "ADD");
+            break;
+        case IR_INST_TYPE_SUB:
+            fprintf(out, "SUB");
+            break;
+        case IR_INST_TYPE_MUL:
+            fprintf(out, "MUL");
+            break;
+        case IR_INST_TYPE_DIV:
+            fprintf(out, "DIV");
+            break;
+        default:
+            fprintf(out, "UNKNOWN_INST");
+            break;
+    }
+    fprintf(out, "\n");
+
+    print_spaces(out, rec);
+    fprintf(out, "op1:\n");
+    ir_op_print(out, inst->op1, rec + REC_SHIFT);
+
+    print_spaces(out, rec);
+    fprintf(out, "op2:\n");
+    ir_op_print(out, inst->op2, rec + REC_SHIFT);
+
+    print_spaces(out, rec);
+    fprintf(out, "op3:\n");
+    ir_op_print(out, inst->op3, rec + REC_SHIFT);
+}
+
+void ir_print(FILE *out, IR *ir) {
+    for (uint32_t i=0; i<ir->instructions->items_count; i++) {
+        fprintf(out, "inst %"PRIu32":\n", i);
+        ir_inst_print(out, (IRInst *) vector_get(ir->instructions, i), REC_SHIFT);
+        fprintf(out, "\n");
+    }
+}
+
+
+
+IR *ir_build(Node *ast) {
+    IR *ir = ir_new();
+    ir_from_node(ir, ast);
+    return ir;
 }

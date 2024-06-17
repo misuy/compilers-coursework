@@ -1,6 +1,6 @@
 {
 i32 test;
-for ({}, true, {})
-    test = test + 1;
-test = 1;
+i32 test1;
+test = 1 ^ 2 + 3 & 4 * test1 / test1;
+test1 = test;
 }

@@ -55,7 +55,8 @@ typedef struct IROp {
 
 
 typedef enum IRInstType {
-    IR_INST_TYPE_JMP = 1,
+    IR_INST_TYPE_MOV = 1,
+    IR_INST_TYPE_JMP,
     IR_INST_TYPE_JEQ,
     IR_INST_TYPE_JNE,
     IR_INST_TYPE_LOAD,
@@ -88,6 +89,10 @@ typedef struct IR {
     Vector *instructions;
 } IR;
 
+
+
+void ir_print(FILE *out, IR *ir);
+IR *ir_build(Node *ast);
 
 
 #endif
