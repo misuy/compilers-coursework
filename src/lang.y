@@ -13,7 +13,6 @@
     Node *node;
 
     VarData *var_data;
-    U32ValueData *u32_value_data;
     I32ValueData *i32_value_data;
     BoolValueData *bool_value_data;
     UnaryOpData *unary_op_data;
@@ -37,7 +36,7 @@
 }
 
 
-%type <node> expr stmt blk
+%type <node> top expr stmt blk
 
 %type <stmt_list> stmt_list
 
@@ -78,11 +77,14 @@
 %%
 
 
+top:
+    blk { $$ = $1; *result = $$; };
+
 
 blk:
-    stmt { $$ = new_node(NODE_TYPE_BLK, new_blk_data(new_stmt_list($1, NULL))); *result = $$; }
-|   '{' stmt_list '}' { $$ = new_node(NODE_TYPE_BLK, new_blk_data($2)); *result = $$; }
-|   '{' '}' { $$ = new_node(NODE_TYPE_BLK, NULL); *result = $$; }
+    stmt { $$ = new_node(NODE_TYPE_BLK, new_blk_data(new_stmt_list($1, NULL))); }
+|   '{' stmt_list '}' { $$ = new_node(NODE_TYPE_BLK, new_blk_data($2)); }
+|   '{' '}' { $$ = new_node(NODE_TYPE_BLK, NULL); }
 ;
 
 stmt_list:

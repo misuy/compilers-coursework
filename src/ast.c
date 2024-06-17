@@ -1,6 +1,10 @@
 #include "ast.h"
 
+/*
+//
 // constructors
+//
+*/
 
 Node * new_node(NodeType type, void *data) {
     Node *ret = malloc(sizeof(Node));
@@ -17,12 +21,6 @@ ExprData * new_expr_data(ExprType type, void *data) {
 VarData * new_var_data(char *name) {
     VarData *ret = malloc(sizeof(VarData));
     *ret = (VarData) { .name = name };
-    return ret;
-}
-
-U32ValueData * new_u32_value_data(uint32_t value) {
-    U32ValueData *ret = malloc(sizeof(U32ValueData));
-    *ret = (U32ValueData) { .value = value };
     return ret;
 }
 
@@ -107,17 +105,17 @@ BlkData * new_blk_data(StmtList *stmt_list) {
     return ret;
 }
 
-
+/*
+//
 // print functions
-
+//
+*/
 
 void print_spaces(FILE *out, uint32_t count) {
     for (uint32_t i=0; i<count; i++) {
         fprintf(out, " ");
     }
 }
-
-
 
 void print_var_data(FILE *out, VarData *var_data, uint32_t rec) {
     if (!var_data) {
@@ -131,23 +129,6 @@ void print_var_data(FILE *out, VarData *var_data, uint32_t rec) {
 
     print_spaces(out, rec * REC_SHIFT);
     fprintf(out, "name: %s\n", var_data->name);
-
-    print_spaces(out, rec * REC_SHIFT);
-    fprintf(out, "}\n");
-}
-
-void print_u32_value_data(FILE *out, U32ValueData *u32_value_data, uint32_t rec) {
-    if (!u32_value_data) {
-        print_spaces(out, rec * REC_SHIFT);
-        fprintf(out, "NULL\n");
-        return;
-    }
-
-    print_spaces(out, rec * REC_SHIFT);
-    fprintf(out, "u32_value_data {\n");
-
-    print_spaces(out, rec * REC_SHIFT);
-    fprintf(out, "value: %" PRIu32 "\n", u32_value_data->value);
 
     print_spaces(out, rec * REC_SHIFT);
     fprintf(out, "}\n");
@@ -286,10 +267,6 @@ void print_expr_type(FILE *out, ExprType expr_type) {
             printf("VAR");
             break;
 
-        case EXPR_TYPE_U32_VALUE:
-            printf("U32_VALUE");
-            break;
-
         case EXPR_TYPE_I32_VALUE:
             printf("I32_VALUE");
             break;
@@ -335,10 +312,6 @@ void print_expr_data(FILE *out, ExprData *expr_data, uint32_t rec) {
             print_var_data(out, (VarData *) expr_data->data, rec + 1);
             break;
 
-        case EXPR_TYPE_U32_VALUE:
-            print_u32_value_data(out, (U32ValueData *) expr_data->data, rec + 1);
-            break;
-
         case EXPR_TYPE_I32_VALUE:
             print_i32_value_data(out, (I32ValueData *) expr_data->data, rec + 1);
             break;
@@ -363,15 +336,10 @@ void print_expr_data(FILE *out, ExprData *expr_data, uint32_t rec) {
     fprintf(out, "}\n");
 }
 
-
-
 void print_data_type(FILE *out, DataType data_type) {
     switch (data_type) {
         case DATA_TYPE_BOOL:
             fprintf(out, "BOOL");
-            break;
-        case DATA_TYPE_U32:
-            fprintf(out, "U32");
             break;
         case DATA_TYPE_I32:
             fprintf(out, "I32");

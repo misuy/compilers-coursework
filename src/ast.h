@@ -19,7 +19,6 @@ typedef enum NodeType {
 
 typedef enum ExprType {
     EXPR_TYPE_VAR,
-    EXPR_TYPE_U32_VALUE,
     EXPR_TYPE_I32_VALUE,
     EXPR_TYPE_BOOL_VALUE,
     EXPR_TYPE_UNARY_OP,
@@ -54,7 +53,6 @@ typedef enum StmtType {
 } StmtType;
 
 typedef enum DataType {
-    DATA_TYPE_U32,
     DATA_TYPE_I32,
     DATA_TYPE_BOOL,
 } DataType;
@@ -77,10 +75,6 @@ typedef struct ExprData {
 typedef struct VarData {
     char *name;
 } VarData;
-
-typedef struct U32ValueData {
-    uint32_t value;
-} U32ValueData;
 
 typedef struct I32ValueData {
     int32_t value;
@@ -114,7 +108,7 @@ typedef struct VarDeclData {
 } VarDeclData;
 
 typedef struct AssignData {
-    Node *var; // NODE_TYPE_STMT(STMT_TYPE_VAR_DECL) | NODE_TYPE_EXPR(EXPR_TYPE_VAR)
+    Node *var; // NODE_TYPE_EXPR(EXPR_TYPE_VAR)
     Node *expr; // NODE_TYPE_EXPR
 } AssignData;
 
@@ -156,7 +150,6 @@ typedef struct BlkData {
 Node * new_node(NodeType type, void *data);
 ExprData * new_expr_data(ExprType type, void *data);
 VarData * new_var_data(char *name);
-U32ValueData * new_u32_value_data(uint32_t value);
 I32ValueData * new_i32_value_data(int32_t value);
 BoolValueData * new_bool_value_data(uint8_t value);
 UnaryOpData * new_unary_op_data(UnaryOpType type, Node *operand);
