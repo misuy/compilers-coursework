@@ -1,6 +1,20 @@
 {
-i32 test;
-i32 test1;
-test = 1 ^ 2 + 3 & 4 * test1 / test1;
-test1 = test;
+    i32 test;
+    i32 test1;
+    test = 1 ^ 2 + 3 & 4 * test1 / test1;
+    test1 = test;
+    if (test == 1)
+        test1 = 0;
+    elif (test == 2)
+        test1 = 1;
+    else
+        test1 = 2;
+
+    for (
+        { i32 i; i = 0; }, 
+        i < 10, 
+        { i = i + 1; }
+    ) {
+        test1 = test1 + 1;
+    }
 }

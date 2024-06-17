@@ -3,6 +3,8 @@
 
 IR * ir_new();
 void ir_add_inst(IR *ir, IRInst *inst);
+IRInst * ir_get_inst(IR *ir, uint32_t idx);
+uint32_t ir_get_instructions_count(IR *ir);
 
 IRInst * ir_inst_new(IRInstType type, IROp *op1, IROp *op2, IROp *op3);
 
@@ -26,6 +28,9 @@ IROp * ir_from_expr(IR *ir, ExprData *expr);
 
 void ir_from_var_decl(IR *ir, VarDeclData *var_decl);
 void ir_from_assign(IR *ir, AssignData *assign);
+void ir_from_if_case(IR *ir, IfCase *if_case, uint32_t jmp_out);
+void ir_from_if_stmt(IR* ir, IfData *if_stmt);
+void ir_from_for_stmt(IR *ir, ForData *for_stmt);
 void ir_from_stmt(IR* ir, StmtData *stmt);
 
 void ir_from_blk(IR *ir, BlkData *blk);
@@ -49,6 +54,16 @@ IR * ir_new() {
 
 void ir_add_inst(IR *ir, IRInst *inst) {
     vector_push_back(ir->instructions, inst);
+}
+
+IRInst * ir_get_inst(IR *ir, uint32_t idx) {
+    if (idx == 0)
+        return NULL;
+    return vector_get(ir->instructions, idx - 1);
+}
+
+uint32_t ir_get_instructions_count(IR *ir) {
+    return ir->instructions->items_count;
 }
 
 
@@ -331,6 +346,109 @@ void ir_from_assign(IR *ir, AssignData *assign) {
     ir_add_inst(ir, inst);
 }
 
+void ir_from_if_case(IR *ir, IfCase *if_case, uint32_t jmp_out) {
+    uint32_t saved_inst_n = 0;
+    if (if_case->cond) {
+        if (if_case->cond->type != NODE_TYPE_EXPR)
+            return;
+        
+        IROp *op = ir_from_expr(ir, if_case->cond->data);
+        if (!op)
+            return;
+        op->direction = IR_OP_DIRECTION_SRC;
+
+        IRInst *jmp_inst = ir_inst_new(IR_INST_TYPE_JMP_IF0, NULL, op, NULL);
+        ir_add_inst(ir, jmp_inst);
+        saved_inst_n = ir_get_instructions_count(ir); 
+    }
+
+    ir_from_node(ir, if_case->body);
+
+    IRInst *jmp_out_inst = ir_inst_new(
+        IR_INST_TYPE_JMP, 
+        ir_op_new(IR_OP_DIRECTION_SRC, IR_OP_TYPE_IMM, ir_imm_new(IR_DATA_TYPE_I32, jmp_out)), 
+        NULL, 
+        NULL
+    );
+    ir_add_inst(ir, jmp_out_inst);
+
+
+    if (saved_inst_n != 0) {
+        IRInst *jmp_inst = ir_get_inst(ir, saved_inst_n);
+        jmp_inst->op1 = ir_op_new(IR_OP_DIRECTION_SRC, IR_OP_TYPE_IMM, ir_imm_new(IR_DATA_TYPE_I32, ir_get_instructions_count(ir) + 1));
+    }
+}
+
+void ir_from_if_stmt(IR* ir, IfData *if_stmt) {
+    IRInst *skip_jmp_inst = ir_inst_new(
+        IR_INST_TYPE_JMP,
+        ir_op_new(IR_OP_DIRECTION_SRC, IR_OP_TYPE_IMM, ir_imm_new(IR_DATA_TYPE_I32, ir_get_instructions_count(ir) + 3)),
+        NULL,
+        NULL
+    );
+    ir_add_inst(ir, skip_jmp_inst);
+
+    IRInst *skip_if_inst = ir_inst_new(
+        IR_INST_TYPE_JMP,
+        NULL,
+        NULL,
+        NULL
+    );
+    ir_add_inst(ir, skip_if_inst);
+    uint32_t skip_if_inst_n = ir_get_instructions_count(ir);
+
+    IfCaseList *if_list = if_stmt->if_case_list;
+    while (if_list) {
+        ir_from_if_case(ir, if_list->if_case, skip_if_inst_n);
+        if_list = if_list->next;
+    }
+
+    skip_if_inst = ir_get_inst(ir, skip_if_inst_n);
+    skip_if_inst->op1 = ir_op_new(IR_OP_DIRECTION_SRC, IR_OP_TYPE_IMM, ir_imm_new(IR_DATA_TYPE_I32, ir_get_instructions_count(ir) + 1));
+}
+
+void ir_from_for_stmt(IR *ir, ForData *for_stmt) {
+    if (for_stmt->cond->type != NODE_TYPE_EXPR)
+        return;
+
+    ir_from_node(ir, for_stmt->init);
+
+    uint32_t jump_back = ir_get_instructions_count(ir) + 1;
+    uint32_t saved_jump_inst_n = 0;
+
+    if (for_stmt->cond->data) {
+        IROp *op = ir_from_expr(ir, for_stmt->cond->data);
+        if (!op)
+            return;
+        op->direction = IR_OP_DIRECTION_SRC;
+
+        IRInst *jmp_inst = ir_inst_new(
+            IR_INST_TYPE_JMP_IF0,
+            NULL,
+            op,
+            NULL
+        );
+        ir_add_inst(ir, jmp_inst);
+        saved_jump_inst_n = ir_get_instructions_count(ir);
+    }
+
+    ir_from_node(ir, for_stmt->body);
+    ir_from_node(ir, for_stmt->it);
+
+    IRInst *jmp_back_inst = ir_inst_new(
+        IR_INST_TYPE_JMP,
+        ir_op_new(IR_OP_DIRECTION_SRC, IR_OP_TYPE_IMM, ir_imm_new(IR_DATA_TYPE_I32, jump_back)),
+        NULL,
+        NULL
+    );
+    ir_add_inst(ir, jmp_back_inst);
+
+    if (saved_jump_inst_n != 0) {
+        IRInst *jmp_inst = ir_get_inst(ir, saved_jump_inst_n);
+        jmp_inst->op1 = ir_op_new(IR_OP_DIRECTION_SRC, IR_OP_TYPE_IMM, ir_imm_new(IR_DATA_TYPE_I32, ir_get_instructions_count(ir) + 1));
+    }
+}
+
 void ir_from_stmt(IR* ir, StmtData *stmt) {
     if (!stmt)
         return;
@@ -342,6 +460,11 @@ void ir_from_stmt(IR* ir, StmtData *stmt) {
         case STMT_TYPE_ASSIGN:
             ir_from_assign(ir, stmt->data);
             break;
+        case STMT_TYPE_IF:
+            ir_from_if_stmt(ir, stmt->data);
+            break;
+        case STMT_TYPE_FOR:
+            ir_from_for_stmt(ir, stmt->data);
         default:
             break;
     }
@@ -473,11 +596,11 @@ void ir_inst_print(FILE *out, IRInst *inst, uint32_t rec) {
         case IR_INST_TYPE_JMP:
             fprintf(out, "JMP");
             break;
-        case IR_INST_TYPE_JEQ:
-            fprintf(out, "JEQ");
+        case IR_INST_TYPE_JMP_IF0:
+            fprintf(out, "JMP_IF0");
             break;
-        case IR_INST_TYPE_JNE:
-            fprintf(out, "JNE");
+        case IR_INST_TYPE_JMP_IF1:
+            fprintf(out, "JMP_IF1");
             break;
         case IR_INST_TYPE_LOAD:
             fprintf(out, "LOAD");
@@ -530,7 +653,7 @@ void ir_inst_print(FILE *out, IRInst *inst, uint32_t rec) {
 
 void ir_print(FILE *out, IR *ir) {
     for (uint32_t i=0; i<ir->instructions->items_count; i++) {
-        fprintf(out, "inst %"PRIu32":\n", i);
+        fprintf(out, "inst %"PRIu32":\n", i + 1);
         ir_inst_print(out, (IRInst *) vector_get(ir->instructions, i), REC_SHIFT);
         fprintf(out, "\n");
     }

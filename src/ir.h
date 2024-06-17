@@ -57,8 +57,8 @@ typedef struct IROp {
 typedef enum IRInstType {
     IR_INST_TYPE_MOV = 1,
     IR_INST_TYPE_JMP,
-    IR_INST_TYPE_JEQ,
-    IR_INST_TYPE_JNE,
+    IR_INST_TYPE_JMP_IF0,
+    IR_INST_TYPE_JMP_IF1,
     IR_INST_TYPE_LOAD,
     IR_INST_TYPE_SAVE,
     IR_INST_TYPE_EQUAL,

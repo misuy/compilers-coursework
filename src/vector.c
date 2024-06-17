@@ -25,7 +25,7 @@ Vector * vector_new(uint32_t item_size, uint32_t intitial_capacity) {
 
 void vector_multiply(Vector *v) {
     v->capacity = v->capacity * VECTOR_MULTIPLIER;
-    v->data = realloc(v->data, v->capacity);
+    v->data = realloc(v->data, v->item_size * v->capacity);
 }
 
 void vector_push_back(Vector *v, void *item) {
