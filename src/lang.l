@@ -5,16 +5,24 @@
 %}
 
 %option noyywrap
+%x MULTILN_COMMENT
 
 %%
 
 [\s\n] ;
+
+"//".* ;
+
+"/*".* { BEGIN MULTILN_COMMENT; }
+<MULTILN_COMMENT>.*"*/" { BEGIN INITIAL; }
+<MULTILN_COMMENT>. ;
 
 "i32" { yylval.data_type = DATA_TYPE_I32; return TOK_DATA_TYPE; }
 "bool" { yylval.data_type = DATA_TYPE_BOOL; return TOK_DATA_TYPE; }
 
 "true" { yylval.bool_value = 1; return TOK_BOOL_VALUE; }
 "false" { yylval.bool_value = 0; return TOK_BOOL_VALUE; }
+
 
 "{" |
 "}" |
