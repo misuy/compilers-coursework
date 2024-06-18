@@ -1,7 +1,7 @@
 OUT_NAME = main
 
-build: src/main.c src/vector.c src/ir.c src/ast.c src/ast.h src/lang.tab.c src/lex.yy.c
-	gcc -o $(OUT_NAME) src/main.c src/vector.c src/ir.c src/ast.c src/lang.tab.c src/lex.yy.c
+build: src/main.c src/vector.c src/ir.c src/codegen.c src/ast.c src/ast.h src/lang.tab.c src/lex.yy.c
+	gcc -o $(OUT_NAME) src/main.c src/vector.c src/ir.c src/codegen.c src/ast.c src/lang.tab.c src/lex.yy.c
 
 bison: src/lang.tab.c
 
