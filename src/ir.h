@@ -18,6 +18,8 @@ typedef enum IRDataType {
 typedef struct IRRegMappingItem {
     IRDataType type;
     char *var_name;
+    uint32_t first_used;
+    uint32_t last_used;
 } IRRegMappingItem;
 
 typedef struct IRRegMapping {

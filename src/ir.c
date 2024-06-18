@@ -2,6 +2,7 @@
 
 
 IR * ir_new();
+void ir_change_lifetimes(IR *ir, uint32_t first_inst, uint32_t last_inst, uint32_t first_used, uint32_t last_used);
 void ir_add_inst(IR *ir, IRInst *inst);
 IRInst * ir_get_inst(IR *ir, uint32_t idx);
 uint32_t ir_get_instructions_count(IR *ir);
@@ -38,6 +39,7 @@ void ir_from_blk(IR *ir, BlkData *blk);
 void ir_from_node(IR *ir, Node *node);
 
 void print_spaces(FILE *out, uint32_t count);
+void ir_reg_mapping_item_print(FILE *out, IRRegMappingItem *item, uint32_t rec);
 void ir_reg_print(FILE *out, IRReg *reg, uint32_t rec);
 void ir_imm_print(FILE *out, IRImm *imm, uint32_t rec);
 void ir_op_print(FILE *out, IROp *op, uint32_t rec);
@@ -54,6 +56,74 @@ IR * ir_new() {
 
 void ir_add_inst(IR *ir, IRInst *inst) {
     vector_push_back(ir->instructions, inst);
+
+    if (inst->op1) {
+        if (inst->op1->type == IR_OP_TYPE_REG) {
+            IRRegMappingItem *item = ir_reg_mapping_get_mapping_item_by_number(ir->reg_mapping, ((IRReg *) inst->op1->data)->number);
+            if (item->first_used == 0)
+                item->first_used = ir_get_instructions_count(ir);
+            if (item->last_used < ir_get_instructions_count(ir))
+                item->last_used = ir_get_instructions_count(ir);
+        }
+    }
+    if (inst->op2) {
+        if (inst->op2->type == IR_OP_TYPE_REG) {
+            IRRegMappingItem *item = ir_reg_mapping_get_mapping_item_by_number(ir->reg_mapping, ((IRReg *) inst->op2->data)->number);
+            if (item->first_used == 0)
+                item->first_used = ir_get_instructions_count(ir);
+            if (item->last_used < ir_get_instructions_count(ir))
+                item->last_used = ir_get_instructions_count(ir);
+        }
+    }
+    if (inst->op3) {
+        if (inst->op3->type == IR_OP_TYPE_REG) {
+            IRRegMappingItem *item = ir_reg_mapping_get_mapping_item_by_number(ir->reg_mapping, ((IRReg *) inst->op3->data)->number);
+            if (item->first_used == 0)
+                item->first_used = ir_get_instructions_count(ir);
+            if (item->last_used < ir_get_instructions_count(ir))
+                item->last_used = ir_get_instructions_count(ir);
+        }
+    }
+}
+
+void ir_change_lifetimes(IR *ir, uint32_t first_inst, uint32_t last_inst, uint32_t first_used, uint32_t last_used) {
+    for (uint32_t i=first_inst; i<(last_inst + 1); i++) {
+        IRInst *inst = ir_get_inst(ir, i);
+
+        if (inst->op1) {
+            if (inst->op1->type == IR_OP_TYPE_REG) {
+                IRRegMappingItem *item = ir_reg_mapping_get_mapping_item_by_number(ir->reg_mapping, ((IRReg *) inst->op1->data)->number);
+                if (item->var_name) {
+                    if (first_used < item->first_used)
+                        item->first_used = first_used;
+                    if (item->last_used < last_used)
+                        item->last_used = last_used;
+                }
+            }
+        }
+        if (inst->op2) {
+            if (inst->op2->type == IR_OP_TYPE_REG) {
+                IRRegMappingItem *item = ir_reg_mapping_get_mapping_item_by_number(ir->reg_mapping, ((IRReg *) inst->op2->data)->number);
+                if (item->var_name) {
+                    if (first_used < item->first_used)
+                        item->first_used = first_used;
+                    if (item->last_used < last_used)
+                        item->last_used = last_used;
+                }
+            }
+        }
+        if (inst->op3) {
+            if (inst->op3->type == IR_OP_TYPE_REG) {
+                IRRegMappingItem *item = ir_reg_mapping_get_mapping_item_by_number(ir->reg_mapping, ((IRReg *) inst->op3->data)->number);
+                if (item->var_name) {
+                    if (first_used < item->first_used)
+                        item->first_used = first_used;
+                    if (item->last_used < last_used)
+                        item->last_used = last_used;
+                }
+            }
+        }
+    }
 }
 
 IRInst * ir_get_inst(IR *ir, uint32_t idx) {
@@ -90,6 +160,8 @@ uint32_t ir_reg_mapping_get_items_count(IRRegMapping *mapping) {
 }
 
 void ir_reg_mapping_add_mapping_item(IRRegMapping *mapping, IRRegMappingItem *item) {
+    item->first_used = 0;
+    item->last_used = 0;
     vector_push_back(mapping->items, item);
 }
 
@@ -447,6 +519,8 @@ void ir_from_for_stmt(IR *ir, ForData *for_stmt) {
         IRInst *jmp_inst = ir_get_inst(ir, saved_jump_inst_n);
         jmp_inst->op1 = ir_op_new(IR_OP_DIRECTION_SRC, IR_OP_TYPE_IMM, ir_imm_new(IR_DATA_TYPE_I32, ir_get_instructions_count(ir) + 1));
     }
+
+    ir_change_lifetimes(ir, jump_back, ir_get_instructions_count(ir), jump_back, ir_get_instructions_count(ir));
 }
 
 void ir_from_stmt(IR* ir, StmtData *stmt) {
@@ -505,6 +579,34 @@ void ir_from_node(IR *ir, Node *node) {
 }
 
 
+
+void ir_reg_mapping_item_print(FILE *out, IRRegMappingItem *item, uint32_t rec) {
+    print_spaces(out, rec);
+    fprintf(out, "var_name: ");
+    if (item->var_name)
+        fprintf(out, "%s\n", item->var_name);
+    else
+        fprintf(out, "NULL\n");
+    
+    print_spaces(out, rec);
+    fprintf(out, "type: ");
+    switch (item->type) {
+        case IR_DATA_TYPE_BOOL:
+            fprintf(out, "BOOL\n");
+            break;
+        case IR_DATA_TYPE_I32:
+            fprintf(out, "I32\n");
+            break;
+        default:
+            break;
+    }
+
+    print_spaces(out, rec);
+    fprintf(out, "first_used: %"PRIu32"\n", item->first_used);
+
+    print_spaces(out, rec);
+    fprintf(out, "last_used: %"PRIu32"\n", item->last_used);
+}
 
 void ir_reg_print(FILE *out, IRReg *reg, uint32_t rec) {
     print_spaces(out, rec);
@@ -652,6 +754,14 @@ void ir_inst_print(FILE *out, IRInst *inst, uint32_t rec) {
 }
 
 void ir_print(FILE *out, IR *ir) {
+    fprintf(out, "\n\nREG MAPPING\n");
+    for (uint32_t i=0; i<ir->reg_mapping->items->items_count; i++) {
+        fprintf(out, "reg mapping item %"PRIu32":\n", i + 1);
+        ir_reg_mapping_item_print(out, (IRRegMappingItem *) vector_get(ir->reg_mapping->items, i), REC_SHIFT);
+        fprintf(out, "\n");
+    }
+
+    fprintf(out, "\n\nINSTRUCTIONS\n");
     for (uint32_t i=0; i<ir->instructions->items_count; i++) {
         fprintf(out, "inst %"PRIu32":\n", i + 1);
         ir_inst_print(out, (IRInst *) vector_get(ir->instructions, i), REC_SHIFT);
