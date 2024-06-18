@@ -1,10 +1,10 @@
 %{
     extern int yylex();
-    extern void yyerror();
 %}
 
-%code requires { 
+%code requires {
     #include "ast.h"
+    #include "error.h"
 }
 %parse-param { Node **result }
 

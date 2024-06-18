@@ -2,6 +2,8 @@
     #include "ast.h"
     #include "lang.tab.h"
     #include <string.h>
+
+    #define YY_USER_ACTION handle_lexem(yytext, yy_act);
 %}
 
 %option noyywrap
