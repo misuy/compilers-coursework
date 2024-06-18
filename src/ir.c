@@ -701,15 +701,6 @@ void ir_inst_print(FILE *out, IRInst *inst, uint32_t rec) {
         case IR_INST_TYPE_JMP_IF0:
             fprintf(out, "JMP_IF0");
             break;
-        case IR_INST_TYPE_JMP_IF1:
-            fprintf(out, "JMP_IF1");
-            break;
-        case IR_INST_TYPE_LOAD:
-            fprintf(out, "LOAD");
-            break;
-        case IR_INST_TYPE_SAVE:
-            fprintf(out, "SAVE");
-            break;
         case IR_INST_TYPE_NOT:
             fprintf(out, "NOT");
             break;

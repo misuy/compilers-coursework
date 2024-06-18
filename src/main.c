@@ -2,6 +2,7 @@
 #include "ast.h"
 #include "stdio.h"
 #include "ir.h"
+#include "codegen.h"
 
 extern FILE *yyin;
 
@@ -17,6 +18,8 @@ int main() {
     printf("ir\n");
     ir_print(stdout, ir);
     printf("after ir\n");
+    Code *code = code_from_ir(ir);
+    code_print(stdout, code);
     //printf("%lu\n", result);
 }
 
